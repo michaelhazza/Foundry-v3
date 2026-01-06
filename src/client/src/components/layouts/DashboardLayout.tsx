@@ -153,7 +153,13 @@ export function DashboardLayout() {
     if (href === '/') {
       return location.pathname === '/';
     }
-    return location.pathname.startsWith(href);
+    // For /settings and its sub-routes, use exact match to prevent multiple highlights
+    // For other routes like /projects, use prefix matching so /projects/123 highlights Projects
+    if (href.startsWith('/settings')) {
+      return location.pathname === href;
+    }
+    // For other routes, match exact or with path continuation
+    return location.pathname === href || location.pathname.startsWith(href + '/');
   };
 
   return (
