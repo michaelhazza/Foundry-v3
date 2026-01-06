@@ -15,7 +15,7 @@ export function LoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    login.mutate({ email, password });
+    login.mutate({ email: email.trim(), password });
   };
 
   const error = login.error as ApiError | null;
