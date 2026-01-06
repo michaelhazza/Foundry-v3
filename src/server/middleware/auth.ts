@@ -37,20 +37,35 @@ export async function requireAuth(
       throw new UnauthorizedError('Invalid or expired token');
     }
 
-    // Get user from database
-    const user = await db.query.users.findFirst({
-      where: and(
+    // Validate token payload values before database query
+    if (!Number.isFinite(payload.userId) || !Number.isFinite(payload.organizationId)) {
+      throw new UnauthorizedError('Invalid token payload');
+    }
+
+    // Get user from database using core select API (avoids NaN parameter issues)
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(and(
         eq(users.id, payload.userId),
         eq(users.organizationId, payload.organizationId),
         isNull(users.deletedAt)
-      ),
-      with: {
-        organization: true,
-      },
-    });
+      ))
+      .limit(1);
 
     if (!user) {
       throw new UnauthorizedError('User not found');
+    }
+
+    // Get organization separately
+    const [organization] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, user.organizationId))
+      .limit(1);
+
+    if (!organization) {
+      throw new UnauthorizedError('Organization not found');
     }
 
     // Check if account is locked
@@ -65,7 +80,7 @@ export async function requireAuth(
       name: user.name,
       role: user.role,
       organizationId: user.organizationId,
-      organizationName: user.organization.name,
+      organizationName: organization.name,
     };
     req.tokenPayload = payload;
 
