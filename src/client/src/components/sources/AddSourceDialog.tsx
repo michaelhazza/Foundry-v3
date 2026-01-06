@@ -1,8 +1,7 @@
 import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { queryKeys } from '@/lib/queryKeys';
+import { useAuth } from '@/hooks/useAuth';
+import { useConnections } from '@/hooks/useConnections';
 import { useUploadSource, useCreateApiSource, CreateApiSourceInput } from '@/hooks/useSources';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,14 +26,6 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import type { ApiResponse } from '@shared/types';
-
-interface Connection {
-  id: number;
-  name: string;
-  type: string;
-  status: 'active' | 'error' | 'pending';
-}
 
 interface AddSourceDialogProps {
   projectId: number;
@@ -46,6 +37,10 @@ export function AddSourceDialog({ projectId, trigger }: AddSourceDialogProps) {
   const [activeTab, setActiveTab] = useState('file');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Get current user to check admin status
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
   // API source form state
   const [connectionId, setConnectionId] = useState<string>('');
   const [sourceName, setSourceName] = useState('');
@@ -53,17 +48,11 @@ export function AddSourceDialog({ projectId, trigger }: AddSourceDialogProps) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Fetch connections
-  const { data: connections, isLoading: connectionsLoading } = useQuery({
-    queryKey: queryKeys.connections.lists(),
-    queryFn: async () => {
-      const response = await api.get<ApiResponse<Connection[]>>('/connections');
-      return response.data;
-    },
-    enabled: open,
-  });
+  // Fetch connections (only for admin users when dialog is open)
+  const { data: connections, isLoading: connectionsLoading } = useConnections();
 
-  const activeConnections = connections?.filter((c) => c.status === 'active') || [];
+  // Filter to only active connections when dialog is open and user is admin
+  const activeConnections = (open && isAdmin && connections?.filter((c) => c.status === 'active')) || [];
 
   const uploadSource = useUploadSource();
   const createApiSource = useCreateApiSource();
@@ -148,6 +137,157 @@ export function AddSourceDialog({ projectId, trigger }: AddSourceDialogProps) {
   const isApiFormValid = connectionId && sourceName.trim();
   const isPending = uploadSource.isPending || createApiSource.isPending;
 
+  // Render API tab content based on admin status
+  const renderApiTabContent = () => {
+    if (!isAdmin) {
+      return (
+        <div className="text-center py-8">
+          <svg
+            className="mx-auto h-10 w-10 text-muted-foreground mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+            />
+          </svg>
+          <p className="text-muted-foreground mb-2">
+            Admin access required
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Only administrators can import data from API connections.
+          </p>
+        </div>
+      );
+    }
+
+    if (connectionsLoading) {
+      return (
+        <div className="flex justify-center py-8">
+          <LoadingSpinner size="lg" />
+        </div>
+      );
+    }
+
+    if (activeConnections.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <svg
+            className="mx-auto h-10 w-10 text-muted-foreground mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+            />
+          </svg>
+          <p className="text-muted-foreground mb-4">
+            No active connections available.
+          </p>
+          <Link
+            to="/settings/connections"
+            className="text-primary hover:underline text-sm"
+            onClick={() => setOpen(false)}
+          >
+            Go to Settings &gt; Connections
+          </Link>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <div className="space-y-2">
+          <Label htmlFor="connection">
+            API Connection <span className="text-destructive">*</span>
+          </Label>
+          <Select value={connectionId} onValueChange={setConnectionId}>
+            <SelectTrigger id="connection">
+              <SelectValue placeholder="Select a connection..." />
+            </SelectTrigger>
+            <SelectContent>
+              {activeConnections.map((connection) => (
+                <SelectItem
+                  key={connection.id}
+                  value={connection.id.toString()}
+                >
+                  {connection.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="sourceName">
+            Source Name <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="sourceName"
+            placeholder="e.g., Teamwork Tickets Q4"
+            value={sourceName}
+            onChange={(e) => setSourceName(e.target.value)}
+          />
+        </div>
+
+        <Separator className="my-4" />
+        <p className="text-sm font-medium text-muted-foreground">Configuration</p>
+
+        <div className="space-y-2">
+          <Label htmlFor="dataType">Data Type</Label>
+          <Select value={dataType} disabled>
+            <SelectTrigger id="dataType">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="tickets">Tickets</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Date Range (optional)</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="flex-1"
+              placeholder="Start Date"
+            />
+            <span className="text-muted-foreground">to</span>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="flex-1"
+              placeholder="End Date"
+            />
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          No connections?{' '}
+          <Link
+            to="/settings/connections"
+            className="text-primary hover:underline"
+            onClick={() => setOpen(false)}
+          >
+            Go to Settings &gt; Connections
+          </Link>
+        </p>
+      </>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
@@ -219,123 +359,11 @@ export function AddSourceDialog({ projectId, trigger }: AddSourceDialogProps) {
           </TabsContent>
 
           <TabsContent value="api" className="space-y-4 pt-4">
-            {connectionsLoading ? (
-              <div className="flex justify-center py-8">
-                <LoadingSpinner size="lg" />
-              </div>
-            ) : activeConnections.length === 0 ? (
-              <div className="text-center py-8">
-                <svg
-                  className="mx-auto h-10 w-10 text-muted-foreground mb-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                  />
-                </svg>
-                <p className="text-muted-foreground mb-4">
-                  No active connections available.
-                </p>
-                <Link
-                  to="/settings/connections"
-                  className="text-primary hover:underline text-sm"
-                  onClick={() => setOpen(false)}
-                >
-                  Go to Settings &gt; Connections
-                </Link>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="connection">
-                    API Connection <span className="text-destructive">*</span>
-                  </Label>
-                  <Select value={connectionId} onValueChange={setConnectionId}>
-                    <SelectTrigger id="connection">
-                      <SelectValue placeholder="Select a connection..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {activeConnections.map((connection) => (
-                        <SelectItem
-                          key={connection.id}
-                          value={connection.id.toString()}
-                        >
-                          {connection.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="sourceName">
-                    Source Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="sourceName"
-                    placeholder="e.g., Teamwork Tickets Q4"
-                    value={sourceName}
-                    onChange={(e) => setSourceName(e.target.value)}
-                  />
-                </div>
-
-                <Separator className="my-4" />
-                <p className="text-sm font-medium text-muted-foreground">Configuration</p>
-
-                <div className="space-y-2">
-                  <Label htmlFor="dataType">Data Type</Label>
-                  <Select value={dataType} disabled>
-                    <SelectTrigger id="dataType">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="tickets">Tickets</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Date Range (optional)</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="flex-1"
-                      placeholder="Start Date"
-                    />
-                    <span className="text-muted-foreground">to</span>
-                    <Input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="flex-1"
-                      placeholder="End Date"
-                    />
-                  </div>
-                </div>
-
-                <p className="text-xs text-muted-foreground">
-                  No connections?{' '}
-                  <Link
-                    to="/settings/connections"
-                    className="text-primary hover:underline"
-                    onClick={() => setOpen(false)}
-                  >
-                    Go to Settings &gt; Connections
-                  </Link>
-                </p>
-              </>
-            )}
+            {renderApiTabContent()}
           </TabsContent>
         </Tabs>
 
-        {activeTab === 'api' && activeConnections.length > 0 && (
+        {activeTab === 'api' && isAdmin && activeConnections.length > 0 && (
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel

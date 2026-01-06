@@ -52,7 +52,7 @@ export function useUploadSource() {
       type: 'csv' | 'excel' | 'json' | 'jsonl';
     }) => {
       const response = await api.upload<ApiResponse<Source>>(
-        `/projects/${projectId}/sources`,
+        `/projects/${projectId}/sources/upload`,
         file,
         { type }
       );

@@ -1,16 +1,20 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { queryKeys } from '@/lib/queryKeys';
-import type { ApiResponse } from '@shared/types';
+import {
+  useConnections,
+  useCreateConnection,
+  useUpdateConnection,
+  useDeleteConnection,
+  useTestConnection,
+  Connection,
+  CreateConnectionInput,
+} from '@/hooks/useConnections';
 import { PageHeader, EmptyState } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -39,7 +43,7 @@ import { toast } from 'sonner';
 
 const CONNECTION_TYPES = [
   {
-    value: 'teamwork_desk',
+    value: 'teamwork_desk' as const,
     label: 'Teamwork Desk',
     description: 'Import tickets from Teamwork Desk',
     icon: 'T',
@@ -47,90 +51,93 @@ const CONNECTION_TYPES = [
 ];
 
 export function ConnectionsPage() {
-  const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
-  const [editConnection, setEditConnection] = useState<any>(null);
+  const [editConnection, setEditConnection] = useState<Connection | null>(null);
   const [deleteConnectionId, setDeleteConnectionId] = useState<number | null>(null);
-  const [newConnection, setNewConnection] = useState({
-    type: '',
+  const [newConnection, setNewConnection] = useState<CreateConnectionInput>({
+    type: 'teamwork_desk',
     name: '',
     credentials: { apiKey: '', subdomain: '' },
   });
 
-  // Fetch connections
-  const { data: connections, isLoading } = useQuery({
-    queryKey: queryKeys.connections.lists(),
-    queryFn: async () => {
-      const response = await api.get<ApiResponse<any[]>>('/connections');
-      return response.data;
-    },
-  });
+  // Use hooks instead of inline queries/mutations
+  const { data: connections, isLoading } = useConnections();
+  const createConnection = useCreateConnection();
+  const updateConnection = useUpdateConnection();
+  const deleteConnection = useDeleteConnection();
+  const testConnection = useTestConnection();
 
-  // Create connection
-  const createConnection = useMutation({
-    mutationFn: async (data: typeof newConnection) => {
-      const response = await api.post<ApiResponse<any>>('/connections', data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connections.lists() });
-      setCreateOpen(false);
-      setNewConnection({ type: '', name: '', credentials: { apiKey: '', subdomain: '' } });
-      toast.success('Connection created');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to create connection');
-    },
-  });
+  const handleCreate = () => {
+    createConnection.mutate(newConnection, {
+      onSuccess: () => {
+        setCreateOpen(false);
+        setNewConnection({
+          type: 'teamwork_desk',
+          name: '',
+          credentials: { apiKey: '', subdomain: '' },
+        });
+        toast.success('Connection created');
+      },
+      onError: (error) => {
+        toast.error(error.message || 'Failed to create connection');
+      },
+    });
+  };
 
-  // Update connection
-  const updateConnection = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const response = await api.patch<ApiResponse<any>>(`/connections/${id}`, data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connections.lists() });
-      setEditConnection(null);
-      toast.success('Connection updated');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to update connection');
-    },
-  });
+  const handleUpdate = () => {
+    if (!editConnection) return;
 
-  // Delete connection
-  const deleteConnection = useMutation({
-    mutationFn: async (id: number) => {
-      await api.delete(`/connections/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.connections.lists() });
-      setDeleteConnectionId(null);
-      toast.success('Connection deleted');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to delete connection');
-    },
-  });
-
-  // Test connection
-  const testConnection = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await api.post<ApiResponse<any>>(`/connections/${id}/test`);
-      return response.data;
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        toast.success('Connection test successful');
-      } else {
-        toast.error(data.error || 'Connection test failed');
+    updateConnection.mutate(
+      {
+        id: editConnection.id,
+        data: {
+          name: editConnection.name,
+          credentials: {
+            apiKey: '', // Will be filled if user enters new value
+            subdomain: '', // Will be filled if user enters new value
+          },
+        },
+      },
+      {
+        onSuccess: () => {
+          setEditConnection(null);
+          toast.success('Connection updated');
+        },
+        onError: (error) => {
+          toast.error(error.message || 'Failed to update connection');
+        },
       }
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Connection test failed');
-    },
-  });
+    );
+  };
+
+  const handleDelete = () => {
+    if (!deleteConnectionId) return;
+
+    deleteConnection.mutate(deleteConnectionId, {
+      onSuccess: () => {
+        setDeleteConnectionId(null);
+        toast.success('Connection deleted');
+      },
+      onError: (error) => {
+        toast.error(error.message || 'Failed to delete connection');
+      },
+    });
+  };
+
+  const handleTest = (id: number) => {
+    testConnection.mutate(id, {
+      onSuccess: (data) => {
+        if (data.success) {
+          toast.success('Connection test successful');
+        } else {
+          toast.error(data.error || 'Connection test failed');
+        }
+      },
+      onError: (error) => {
+        toast.error(error.message || 'Connection test failed');
+      },
+    });
+  };
 
   if (isLoading) {
     return (
@@ -173,7 +180,7 @@ export function ConnectionsPage() {
                   <Label>Connection Type</Label>
                   <Select
                     value={newConnection.type}
-                    onValueChange={(value) => setNewConnection({ ...newConnection, type: value })}
+                    onValueChange={(value: 'teamwork_desk') => setNewConnection({ ...newConnection, type: value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
@@ -231,11 +238,12 @@ export function ConnectionsPage() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => createConnection.mutate(newConnection)}
+                  onClick={handleCreate}
                   disabled={
                     !newConnection.type ||
                     !newConnection.name ||
                     !newConnection.credentials.apiKey ||
+                    !newConnection.credentials.subdomain ||
                     createConnection.isPending
                   }
                 >
@@ -265,7 +273,7 @@ export function ConnectionsPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {connections.map((connection: any) => {
+          {connections.map((connection) => {
             const typeInfo = CONNECTION_TYPES.find((t) => t.value === connection.type);
             return (
               <Card key={connection.id}>
@@ -300,7 +308,7 @@ export function ConnectionsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => testConnection.mutate(connection.id)}
+                        onClick={() => handleTest(connection.id)}
                         disabled={testConnection.isPending}
                       >
                         Test
@@ -350,7 +358,7 @@ export function ConnectionsPage() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => deleteConnectionId && deleteConnection.mutate(deleteConnectionId)}
+              onClick={handleDelete}
               disabled={deleteConnection.isPending}
             >
               {deleteConnection.isPending ? 'Deleting...' : 'Delete'}
