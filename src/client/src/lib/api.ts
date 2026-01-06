@@ -68,14 +68,21 @@ async function request<T>(
   if (!response.ok) {
     // Handle 401 - redirect to login
     if (response.status === 401) {
-      // Try to refresh token
-      const refreshed = await refreshToken();
-      if (refreshed) {
-        // Retry the original request
-        return request<T>(endpoint, options);
+      // Don't redirect if already on auth pages to prevent infinite loop
+      const authPaths = ['/login', '/forgot-password', '/reset-password', '/accept-invitation'];
+      const isAuthPage = authPaths.some(path => window.location.pathname.startsWith(path));
+      
+      if (!isAuthPage) {
+        // Try to refresh token
+        const refreshed = await refreshToken();
+        if (refreshed) {
+          // Retry the original request
+          return request<T>(endpoint, options);
+        }
+        // Redirect to login if refresh failed
+        window.location.href = '/login';
       }
-      // Redirect to login if refresh failed
-      window.location.href = '/login';
+      
       throw new ApiError(
         { error: { code: 'UNAUTHORIZED', message: 'Session expired' } },
         401
