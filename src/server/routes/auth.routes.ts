@@ -17,7 +17,6 @@ const router = Router();
 router.post('/login', validate(loginSchema), async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    console.log('Login attempt - Email:', JSON.stringify(email), 'Password length:', password?.length);
     const result = await authService.login(email, password, req);
 
     // Set cookies
