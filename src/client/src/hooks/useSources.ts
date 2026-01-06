@@ -78,3 +78,41 @@ export function useDeleteSource() {
     },
   });
 }
+
+export interface CreateApiSourceInput {
+  connectionId: number;
+  name: string;
+  config: {
+    dataType: 'tickets';
+    dateRange?: {
+      start?: string;
+      end?: string;
+    };
+    projectFilter?: string[];
+  };
+}
+
+export function useCreateApiSource() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      projectId,
+      data,
+    }: {
+      projectId: number;
+      data: CreateApiSourceInput;
+    }) => {
+      const response = await api.post<ApiResponse<Source>>(
+        `/projects/${projectId}/sources/api`,
+        data
+      );
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.sources.byProject(data.projectId),
+      });
+    },
+  });
+}
