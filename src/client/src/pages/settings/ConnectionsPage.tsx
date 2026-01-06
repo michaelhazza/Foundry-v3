@@ -39,22 +39,10 @@ import { toast } from 'sonner';
 
 const CONNECTION_TYPES = [
   {
-    value: 'teamwork',
+    value: 'teamwork_desk',
     label: 'Teamwork Desk',
     description: 'Import tickets from Teamwork Desk',
     icon: 'T',
-  },
-  {
-    value: 'zendesk',
-    label: 'Zendesk',
-    description: 'Import tickets from Zendesk',
-    icon: 'Z',
-  },
-  {
-    value: 'freshdesk',
-    label: 'Freshdesk',
-    description: 'Import tickets from Freshdesk',
-    icon: 'F',
   },
 ];
 

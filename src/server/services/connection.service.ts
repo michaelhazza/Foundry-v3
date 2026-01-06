@@ -1,4 +1,4 @@
-import { eq, and, count } from 'drizzle-orm';
+import { eq, and, count, desc } from 'drizzle-orm';
 import { db } from '../db';
 import { apiConnections, sources } from '@shared/schema';
 import { createAuditLog } from './audit.service';
@@ -22,10 +22,18 @@ export interface ConnectionResponse {
 export async function listConnections(
   organizationId: number
 ): Promise<ConnectionResponse[]> {
-  const connections = await db.query.apiConnections.findMany({
-    where: eq(apiConnections.organizationId, organizationId),
-    orderBy: (conn, { desc }) => [desc(conn.createdAt)],
-  });
+  // Validate organizationId to prevent NaN issues
+  if (!Number.isFinite(organizationId)) {
+    console.error('[ERROR] Invalid organizationId in listConnections:', organizationId);
+    return [];
+  }
+
+  // Use core select API instead of query API for simpler SQL generation
+  const connections = await db
+    .select()
+    .from(apiConnections)
+    .where(eq(apiConnections.organizationId, organizationId))
+    .orderBy(desc(apiConnections.createdAt));
 
   const results: ConnectionResponse[] = [];
 
@@ -55,12 +63,19 @@ export async function getConnection(
   connectionId: number,
   organizationId: number
 ): Promise<ConnectionResponse> {
-  const connection = await db.query.apiConnections.findFirst({
-    where: and(
+  // Validate inputs
+  if (!Number.isFinite(connectionId) || !Number.isFinite(organizationId)) {
+    throw new NotFoundError('API connection');
+  }
+
+  const [connection] = await db
+    .select()
+    .from(apiConnections)
+    .where(and(
       eq(apiConnections.id, connectionId),
       eq(apiConnections.organizationId, organizationId)
-    ),
-  });
+    ))
+    .limit(1);
 
   if (!connection) {
     throw new NotFoundError('API connection');
@@ -129,12 +144,19 @@ export async function updateConnection(
   userId: number,
   req?: Request
 ): Promise<ConnectionResponse> {
-  const connection = await db.query.apiConnections.findFirst({
-    where: and(
+  // Validate inputs
+  if (!Number.isFinite(connectionId) || !Number.isFinite(organizationId)) {
+    throw new NotFoundError('API connection');
+  }
+
+  const [connection] = await db
+    .select()
+    .from(apiConnections)
+    .where(and(
       eq(apiConnections.id, connectionId),
       eq(apiConnections.organizationId, organizationId)
-    ),
-  });
+    ))
+    .limit(1);
 
   if (!connection) {
     throw new NotFoundError('API connection');
@@ -176,12 +198,19 @@ export async function deleteConnection(
   userId: number,
   req?: Request
 ): Promise<void> {
-  const connection = await db.query.apiConnections.findFirst({
-    where: and(
+  // Validate inputs
+  if (!Number.isFinite(connectionId) || !Number.isFinite(organizationId)) {
+    throw new NotFoundError('API connection');
+  }
+
+  const [connection] = await db
+    .select()
+    .from(apiConnections)
+    .where(and(
       eq(apiConnections.id, connectionId),
       eq(apiConnections.organizationId, organizationId)
-    ),
-  });
+    ))
+    .limit(1);
 
   if (!connection) {
     throw new NotFoundError('API connection');
@@ -214,12 +243,19 @@ export async function testConnection(
   userId: number,
   req?: Request
 ): Promise<{ success: boolean; message: string }> {
-  const connection = await db.query.apiConnections.findFirst({
-    where: and(
+  // Validate inputs
+  if (!Number.isFinite(connectionId) || !Number.isFinite(organizationId)) {
+    throw new NotFoundError('API connection');
+  }
+
+  const [connection] = await db
+    .select()
+    .from(apiConnections)
+    .where(and(
       eq(apiConnections.id, connectionId),
       eq(apiConnections.organizationId, organizationId)
-    ),
-  });
+    ))
+    .limit(1);
 
   if (!connection) {
     throw new NotFoundError('API connection');
