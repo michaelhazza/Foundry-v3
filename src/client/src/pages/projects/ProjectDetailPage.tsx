@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useProject, useUpdateProject, useDeleteProject } from '@/hooks/useProjects';
-import { useSources, useUploadSource, useDeleteSource } from '@/hooks/useSources';
+import { useSources, useDeleteSource } from '@/hooks/useSources';
 import { PageHeader, EmptyState, LoadingSpinner } from '@/components/shared';
+import { AddSourceDialog } from '@/components/sources/AddSourceDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +11,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -78,7 +77,6 @@ function getFileTypeFromMime(mimeType?: string | null): string {
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteSourceId, setDeleteSourceId] = useState<number | null>(null);
@@ -88,39 +86,7 @@ export function ProjectDetailPage() {
   const { data: sources, isLoading: sourcesLoading } = useSources(Number(projectId));
   const updateProject = useUpdateProject();
   const deleteProject = useDeleteProject();
-  const uploadSource = useUploadSource();
   const deleteSource = useDeleteSource();
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    let type: 'csv' | 'excel' | 'json' | 'jsonl' = 'csv';
-
-    if (extension === 'xlsx' || extension === 'xls') {
-      type = 'excel';
-    } else if (extension === 'json') {
-      type = 'json';
-    } else if (extension === 'jsonl') {
-      type = 'jsonl';
-    }
-
-    uploadSource.mutate(
-      { projectId: Number(projectId), file, type },
-      {
-        onSuccess: () => {
-          toast.success('File uploaded successfully');
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-        },
-        onError: (error) => {
-          toast.error(error.message);
-        },
-      }
-    );
-  };
 
   const handleUpdate = () => {
     updateProject.mutate(
@@ -202,31 +168,17 @@ export function ProjectDetailPage() {
         ]}
         actions={
           <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.xlsx,.xls,.json,.jsonl"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadSource.isPending}
-            >
-              {uploadSource.isPending ? (
-                <>
-                  <LoadingSpinner size="sm" className="mr-2" />
-                  Uploading...
-                </>
-              ) : (
-                <>
+            <AddSourceDialog
+              projectId={Number(projectId)}
+              trigger={
+                <Button>
                   <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  Upload source
-                </>
-              )}
-            </Button>
+                  Add source
+                </Button>
+              }
+            />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">
@@ -336,11 +288,13 @@ export function ProjectDetailPage() {
                 </svg>
               }
               title="No sources yet"
-              description="Upload your first data source to get started"
-              action={{
-                label: 'Upload source',
-                onClick: () => fileInputRef.current?.click(),
-              }}
+              description="Upload a file or import from an API connection to get started"
+              actionElement={
+                <AddSourceDialog
+                  projectId={Number(projectId)}
+                  trigger={<Button>Add source</Button>}
+                />
+              }
             />
           ) : (
             <div className="space-y-4">

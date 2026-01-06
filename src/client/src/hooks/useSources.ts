@@ -52,7 +52,7 @@ export function useUploadSource() {
       type: 'csv' | 'excel' | 'json' | 'jsonl';
     }) => {
       const response = await api.upload<ApiResponse<Source>>(
-        `/projects/${projectId}/sources`,
+        `/projects/${projectId}/sources/upload`,
         file,
         { type }
       );
@@ -75,6 +75,44 @@ export function useDeleteSource() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sources.lists() });
+    },
+  });
+}
+
+export interface CreateApiSourceInput {
+  connectionId: number;
+  name: string;
+  config: {
+    dataType: 'tickets';
+    dateRange?: {
+      start?: string;
+      end?: string;
+    };
+    projectFilter?: string[];
+  };
+}
+
+export function useCreateApiSource() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      projectId,
+      data,
+    }: {
+      projectId: number;
+      data: CreateApiSourceInput;
+    }) => {
+      const response = await api.post<ApiResponse<Source>>(
+        `/projects/${projectId}/sources/api`,
+        data
+      );
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.sources.byProject(data.projectId),
+      });
     },
   });
 }
