@@ -26,12 +26,14 @@ export function registerRoutes(app: Express): void {
   // Organization routes
   app.use('/api/organization', organizationsRoutes);
 
+  // Connection routes - MUST be before any parameterized /api routes
+  app.use('/api/connections', connectionsRoutes);
+
   // Project routes
   app.use('/api/projects', projectsRoutes);
 
   // Source routes (includes nested routes for projects)
   app.use('/api/sources', sourcesRoutes);
-  app.use('/api', sourcesRoutes); // For /api/projects/:projectId/sources
 
   // Mapping routes
   app.use('/api/sources', mappingsRoutes);
@@ -48,12 +50,13 @@ export function registerRoutes(app: Express): void {
 
   // Output routes
   app.use('/api/outputs', outputsRoutes);
-  app.use('/api', outputsRoutes); // For /api/sources/:sourceId/outputs
-
-  // Connection routes
-  app.use('/api/connections', connectionsRoutes);
 
   // Audit routes
   app.use('/api/audit-log', auditRoutes);
+
+  // IMPORTANT: Routes with parameterized paths mounted at /api MUST be registered LAST
+  // These catch-all patterns could match specific routes if registered first
+  app.use('/api', sourcesRoutes); // For /api/projects/:projectId/sources
+  app.use('/api', outputsRoutes); // For /api/sources/:sourceId/outputs
   app.use('/api', auditRoutes); // For /api/projects/:projectId/audit-log
 }

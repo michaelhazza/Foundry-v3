@@ -24,11 +24,10 @@ export async function listConnections(
 ): Promise<ConnectionResponse[]> {
   // Validate organizationId to prevent NaN issues
   if (!Number.isFinite(organizationId)) {
-    console.error('[ERROR] Invalid organizationId in listConnections:', organizationId);
     return [];
   }
 
-  // Use core select API instead of query API for simpler SQL generation
+  // Use core select API
   const connections = await db
     .select()
     .from(apiConnections)

@@ -57,9 +57,20 @@ Foundry is a fullstack web application for preparing AI training data with PII d
 - `RESEND_API_KEY` - Optional, for email functionality
 
 ## Recent Changes
+- 2026-01-06: Fixed critical route registration bug
+  - Fixed "NaN parameter" error on GET /api/connections endpoint
+  - Root cause: Route order issue - parameterized routes mounted at `/api` were catching specific routes
+  - Solution: Moved specific routes (connections, projects) before catch-all parameterized routes in routes/index.ts
+  - Added tsconfig.json include for server files
+  
 - 2026-01-06: Initial Replit setup
   - Configured Vite to allow all hosts for Replit proxy
   - Updated CORS settings for development
   - Added GET /api/auth/profile endpoint
   - Installed pino-pretty for development logging
   - Configured deployment for autoscale
+
+## Important Notes
+- Route registration order matters! Specific routes must be registered BEFORE parameterized catch-all routes
+- The auth middleware validates JWT token payloads with Number.isFinite() to prevent NaN parameter issues
+- Connection type enum value is 'teamwork_desk' (used in both frontend and backend)

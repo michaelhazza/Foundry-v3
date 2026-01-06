@@ -42,7 +42,7 @@ export async function requireAuth(
       throw new UnauthorizedError('Invalid token payload');
     }
 
-    // Get user from database using core select API (avoids NaN parameter issues)
+    // Get user from database using core select API
     const [user] = await db
       .select()
       .from(users)
