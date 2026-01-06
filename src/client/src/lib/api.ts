@@ -83,6 +83,12 @@ async function request<T>(
         window.location.href = '/login';
       }
       
+      // Preserve the actual server error message (e.g., "Invalid email or password")
+      // Only fall back to "Session expired" if no server error message is available
+      const errorResponse = data as ErrorResponse;
+      if (errorResponse?.error?.message) {
+        throw new ApiError(errorResponse, 401);
+      }
       throw new ApiError(
         { error: { code: 'UNAUTHORIZED', message: 'Session expired' } },
         401
