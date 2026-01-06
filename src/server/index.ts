@@ -29,11 +29,11 @@ app.use(helmet({
   } : false,
 }));
 
-// CORS configuration
+// CORS configuration - allow all origins in development for Replit proxy
 app.use(cors({
   origin: env.NODE_ENV === 'production'
     ? env.APP_URL
-    : ['http://localhost:5000', 'http://localhost:3001', 'http://0.0.0.0:5000'],
+    : true,
   credentials: true,
 }));
 

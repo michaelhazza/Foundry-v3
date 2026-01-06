@@ -91,6 +91,20 @@ router.get('/me', requireAuth, async (req, res, next) => {
   }
 });
 
+// GET /api/auth/profile
+router.get('/profile', requireAuth, async (req, res, next) => {
+  try {
+    const user = await authService.getCurrentUser(req.user!.id);
+
+    res.json({
+      data: user,
+      meta: { timestamp: new Date().toISOString() },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // PATCH /api/auth/profile
 router.patch('/profile', requireAuth, validate(profileUpdateSchema), async (req, res, next) => {
   try {
